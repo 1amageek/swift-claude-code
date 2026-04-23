@@ -110,7 +110,7 @@ public actor ClaudeCodeSession {
                         switch event {
                         case .system(let sys):
                             await self?.updateMetadata(sys)
-                        case .streamEvent, .assistant, .user:
+                        case .systemStatus, .streamEvent, .assistant, .user:
                             break
                         case .result(let res):
                             logger.info("[claude] done turns=\(res.numTurns) cost=$\(String(format: "%.4f", res.totalCostUSD)) duration=\(res.durationMS)ms")

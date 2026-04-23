@@ -5,6 +5,7 @@ import Foundation
 /// A single line from Claude Code's `--output-format stream-json` stdout.
 public enum StreamEvent: Sendable {
     case system(SystemEvent)
+    case systemStatus(SystemStatusEvent)
     case streamEvent(StreamDelta)
     case assistant(AssistantMessage)
     case user(UserMessage)
@@ -44,6 +45,20 @@ public struct MCPServerStatus: Sendable {
 
     public init(name: String, status: String) {
         self.name = name
+        self.status = status
+    }
+}
+
+// MARK: - System Status (heartbeat)
+
+/// Emitted by the CLI between init and result, e.g. `{"subtype":"status","status":"requesting"}`.
+/// Callers can use this to surface intermediate activity without overwriting session metadata.
+public struct SystemStatusEvent: Sendable {
+    public var sessionID: String
+    public var status: String
+
+    public init(sessionID: String, status: String) {
+        self.sessionID = sessionID
         self.status = status
     }
 }
@@ -127,28 +142,58 @@ public struct ToolResult: Sendable {
 
 public struct ResultEvent: Sendable {
     public var sessionID: String
+    /// `"success"`, `"error_during_execution"`, etc.
+    public var subtype: String
     public var result: String
     public var isError: Bool
     public var stopReason: String
+    /// CLI-level termination reason (e.g. `"completed"`, `"cancelled"`).
+    public var terminalReason: String
     public var totalCostUSD: Double
     public var durationMS: Int
     public var numTurns: Int
+    public var usage: Usage?
 
     public init(
         sessionID: String,
+        subtype: String = "",
         result: String,
         isError: Bool,
         stopReason: String,
+        terminalReason: String = "",
         totalCostUSD: Double,
         durationMS: Int,
-        numTurns: Int
+        numTurns: Int,
+        usage: Usage? = nil
     ) {
         self.sessionID = sessionID
+        self.subtype = subtype
         self.result = result
         self.isError = isError
         self.stopReason = stopReason
+        self.terminalReason = terminalReason
         self.totalCostUSD = totalCostUSD
         self.durationMS = durationMS
         self.numTurns = numTurns
+        self.usage = usage
+    }
+}
+
+public struct Usage: Sendable {
+    public var inputTokens: Int
+    public var outputTokens: Int
+    public var cacheCreationInputTokens: Int
+    public var cacheReadInputTokens: Int
+
+    public init(
+        inputTokens: Int,
+        outputTokens: Int,
+        cacheCreationInputTokens: Int,
+        cacheReadInputTokens: Int
+    ) {
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.cacheCreationInputTokens = cacheCreationInputTokens
+        self.cacheReadInputTokens = cacheReadInputTokens
     }
 }

@@ -95,4 +95,68 @@ struct StreamEventParserTests {
             try StreamEventParser().parse(json)
         }
     }
+
+    @Test("system init (explicit subtype) parses as .system")
+    func systemInitExplicit() throws {
+        let json = """
+        {"type":"system","subtype":"init","session_id":"s1","cwd":"/tmp","model":"claude-opus-4-6","tools":[],"mcp_servers":[],"permissionMode":"default"}
+        """
+        let event = try StreamEventParser().parse(json)
+        guard case .system(let sys) = event else { Issue.record("expected .system"); return }
+        #expect(sys.sessionID == "s1")
+    }
+
+    @Test("system status heartbeat parses as .systemStatus (not .system)")
+    func systemStatusHeartbeat() throws {
+        let json = """
+        {"type":"system","subtype":"status","session_id":"s1","status":"requesting"}
+        """
+        let event = try StreamEventParser().parse(json)
+        guard case .systemStatus(let s) = event else {
+            Issue.record("expected .systemStatus — status heartbeat must not be treated as init")
+            return
+        }
+        #expect(s.sessionID == "s1")
+        #expect(s.status == "requesting")
+    }
+
+    @Test("system unknown subtype is ignored")
+    func systemUnknownSubtype() {
+        let json = """
+        {"type":"system","subtype":"something_new","session_id":"s1"}
+        """
+        #expect(throws: StreamEventParser.ParserError.self) {
+            try StreamEventParser().parse(json)
+        }
+    }
+
+    @Test("result event with subtype, terminal_reason, and usage")
+    func resultExtendedFields() throws {
+        let json = """
+        {"type":"result","subtype":"success","session_id":"s1","result":"done","is_error":false,"stop_reason":"end_turn","terminal_reason":"completed","total_cost_usd":0.05,"duration_ms":900,"num_turns":3,"usage":{"input_tokens":10,"output_tokens":20,"cache_creation_input_tokens":5,"cache_read_input_tokens":7}}
+        """
+        let event = try StreamEventParser().parse(json)
+        guard case .result(let r) = event else { Issue.record("expected .result"); return }
+        #expect(r.subtype == "success")
+        #expect(r.terminalReason == "completed")
+        let usage = try #require(r.usage)
+        #expect(usage.inputTokens == 10)
+        #expect(usage.outputTokens == 20)
+        #expect(usage.cacheCreationInputTokens == 5)
+        #expect(usage.cacheReadInputTokens == 7)
+    }
+
+    @Test("tool_use delta start parses tool id and name")
+    func toolUseStartDelta() throws {
+        let json = """
+        {"type":"stream_event","session_id":"s1","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tu9","name":"Read"}}}
+        """
+        let event = try StreamEventParser().parse(json)
+        guard case .streamEvent(let d) = event else { Issue.record("expected .streamEvent"); return }
+        guard case .toolUseStart(_, let id, let name) = d.event else {
+            Issue.record("expected .toolUseStart"); return
+        }
+        #expect(id == "tu9")
+        #expect(name == "Read")
+    }
 }

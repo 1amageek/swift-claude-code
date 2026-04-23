@@ -14,7 +14,15 @@ struct StreamEventParser {
 
         switch type {
         case "system":
-            return .system(parseSystem(json))
+            let subtype = json["subtype"] as? String
+            switch subtype {
+            case "init", nil:
+                return .system(parseSystem(json))
+            case "status":
+                return .systemStatus(parseSystemStatus(json))
+            default:
+                throw ParserError.ignoredType("system/\(subtype ?? "")")
+            }
         case "stream_event":
             return try .streamEvent(parseStreamDelta(json))
         case "assistant":
@@ -46,6 +54,13 @@ struct StreamEventParser {
             tools: json["tools"] as? [String] ?? [],
             mcpServers: servers,
             permissionMode: json["permissionMode"] as? String ?? ""
+        )
+    }
+
+    private func parseSystemStatus(_ json: [String: Any]) -> SystemStatusEvent {
+        SystemStatusEvent(
+            sessionID: json["session_id"] as? String ?? "",
+            status: json["status"] as? String ?? ""
         )
     }
 
@@ -163,14 +178,26 @@ struct StreamEventParser {
     // MARK: - Result
 
     private func parseResult(_ json: [String: Any]) -> ResultEvent {
-        ResultEvent(
+        let usage: Usage? = {
+            guard let u = json["usage"] as? [String: Any] else { return nil }
+            return Usage(
+                inputTokens: u["input_tokens"] as? Int ?? 0,
+                outputTokens: u["output_tokens"] as? Int ?? 0,
+                cacheCreationInputTokens: u["cache_creation_input_tokens"] as? Int ?? 0,
+                cacheReadInputTokens: u["cache_read_input_tokens"] as? Int ?? 0
+            )
+        }()
+        return ResultEvent(
             sessionID: json["session_id"] as? String ?? "",
+            subtype: json["subtype"] as? String ?? "",
             result: json["result"] as? String ?? "",
             isError: json["is_error"] as? Bool ?? false,
             stopReason: json["stop_reason"] as? String ?? "",
+            terminalReason: json["terminal_reason"] as? String ?? "",
             totalCostUSD: json["total_cost_usd"] as? Double ?? 0,
             durationMS: json["duration_ms"] as? Int ?? 0,
-            numTurns: json["num_turns"] as? Int ?? 0
+            numTurns: json["num_turns"] as? Int ?? 0,
+            usage: usage
         )
     }
 

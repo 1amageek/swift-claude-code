@@ -119,4 +119,60 @@ struct ConfigurationTests {
         #expect(!apiKey.isOAuthAuthenticated)
         #expect(!loggedOut.isOAuthAuthenticated)
     }
+
+    @Test("fallbackModel emits --fallback-model")
+    func fallbackModel() {
+        let config = ClaudeCodeConfiguration(model: .opus, fallbackModel: .sonnet)
+        let args = config.arguments(prompt: "x")
+        #expect(args.contains("--fallback-model"))
+        #expect(args.contains("claude-sonnet-4-6"))
+    }
+
+    @Test("disallowedTools emits --disallowedTools with values")
+    func disallowedTools() {
+        let config = ClaudeCodeConfiguration(disallowedTools: ["Bash", "WebFetch"])
+        let args = config.arguments(prompt: "x")
+        #expect(args.contains("--disallowedTools"))
+        #expect(args.contains("Bash"))
+        #expect(args.contains("WebFetch"))
+    }
+
+    @Test("sessionID emits --session-id")
+    func sessionIDFlag() {
+        let config = ClaudeCodeConfiguration(sessionID: "abc-123")
+        let args = config.arguments(prompt: "x")
+        let idx = args.firstIndex(of: "--session-id")
+        #expect(idx != nil)
+        if let idx { #expect(args[args.index(after: idx)] == "abc-123") }
+    }
+
+    @Test("forkSession emits --fork-session as a boolean flag")
+    func forkSessionFlag() {
+        let on = ClaudeCodeConfiguration(forkSession: true)
+        let off = ClaudeCodeConfiguration(forkSession: false)
+        #expect(on.arguments(prompt: "x").contains("--fork-session"))
+        #expect(!off.arguments(prompt: "x").contains("--fork-session"))
+    }
+
+    @Test("disableSessionPersistence emits --no-session-persistence")
+    func disableSessionPersistenceFlag() {
+        let on = ClaudeCodeConfiguration(disableSessionPersistence: true)
+        let off = ClaudeCodeConfiguration(disableSessionPersistence: false)
+        #expect(on.arguments(prompt: "x").contains("--no-session-persistence"))
+        #expect(!off.arguments(prompt: "x").contains("--no-session-persistence"))
+    }
+
+    @Test("strictMCPConfig emits --strict-mcp-config")
+    func strictMCPConfigFlag() {
+        let on = ClaudeCodeConfiguration(
+            mcpConfigs: ["{\"a\":1}"],
+            strictMCPConfig: true
+        )
+        let off = ClaudeCodeConfiguration(
+            mcpConfigs: ["{\"a\":1}"],
+            strictMCPConfig: false
+        )
+        #expect(on.arguments(prompt: "x").contains("--strict-mcp-config"))
+        #expect(!off.arguments(prompt: "x").contains("--strict-mcp-config"))
+    }
 }

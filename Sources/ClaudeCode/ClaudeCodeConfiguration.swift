@@ -36,8 +36,14 @@ public struct ClaudeCodeConfiguration: Sendable {
     /// Model override. When nil, uses the subscription default.
     public var model: ClaudeModel?
 
+    /// Fallback model used when the primary model is overloaded (passed as `--fallback-model`).
+    public var fallbackModel: ClaudeModel?
+
     /// Tools to auto-approve without prompting.
     public var allowedTools: [String]
+
+    /// Tools to explicitly deny (passed as `--disallowedTools`).
+    public var disallowedTools: [String]
 
     /// Maximum agentic turns per invocation.
     public var maxTurns: Int?
@@ -64,6 +70,21 @@ public struct ClaudeCodeConfiguration: Sendable {
     /// When set alongside `mcpConfigs`, both are forwarded to the CLI.
     public var mcpConfigPath: URL?
 
+    /// When true, only MCP servers from `--mcp-config` are used; all other
+    /// sources (global, project, user) are ignored. Maps to `--strict-mcp-config`.
+    public var strictMCPConfig: Bool
+
+    /// Specific session UUID to assign to a new conversation (passed as `--session-id`).
+    public var sessionID: String?
+
+    /// When true and the session is resumed, create a new session ID instead of
+    /// reusing the original (passed as `--fork-session`).
+    public var forkSession: Bool
+
+    /// When true, the session is not persisted to disk and cannot be resumed
+    /// (passed as `--no-session-persistence`).
+    public var disableSessionPersistence: Bool
+
     /// Plugin roots to load (passed as `--plugin-dir`).
     /// Each URL must point to a directory containing `.claude-plugin/plugin.json`.
     public var pluginDirectories: [URL]
@@ -87,7 +108,9 @@ public struct ClaudeCodeConfiguration: Sendable {
         executablePath: String? = nil,
         workingDirectory: URL? = nil,
         model: ClaudeModel? = nil,
+        fallbackModel: ClaudeModel? = nil,
         allowedTools: [String] = [],
+        disallowedTools: [String] = [],
         maxTurns: Int? = nil,
         systemPrompt: String? = nil,
         appendSystemPrompt: String? = nil,
@@ -96,6 +119,10 @@ public struct ClaudeCodeConfiguration: Sendable {
         additionalDirectories: [URL] = [],
         mcpConfigs: [String] = [],
         mcpConfigPath: URL? = nil,
+        strictMCPConfig: Bool = false,
+        sessionID: String? = nil,
+        forkSession: Bool = false,
+        disableSessionPersistence: Bool = false,
         pluginDirectories: [URL] = [],
         environment: [String: String] = [:],
         additionalFlags: [String] = [],
@@ -105,7 +132,9 @@ public struct ClaudeCodeConfiguration: Sendable {
         self.executablePath = executablePath ?? Self.defaultExecutablePath
         self.workingDirectory = workingDirectory
         self.model = model
+        self.fallbackModel = fallbackModel
         self.allowedTools = allowedTools
+        self.disallowedTools = disallowedTools
         self.maxTurns = maxTurns
         self.systemPrompt = systemPrompt
         self.appendSystemPrompt = appendSystemPrompt
@@ -114,6 +143,10 @@ public struct ClaudeCodeConfiguration: Sendable {
         self.additionalDirectories = additionalDirectories
         self.mcpConfigs = mcpConfigs
         self.mcpConfigPath = mcpConfigPath
+        self.strictMCPConfig = strictMCPConfig
+        self.sessionID = sessionID
+        self.forkSession = forkSession
+        self.disableSessionPersistence = disableSessionPersistence
         self.pluginDirectories = pluginDirectories
         self.environment = environment
         self.additionalFlags = additionalFlags
@@ -146,16 +179,36 @@ public struct ClaudeCodeConfiguration: Sendable {
             args += ["--dangerously-skip-permissions"]
         }
 
-        if let sessionID = resumeSessionID {
-            args += ["--resume", sessionID]
+        if let resumeSessionID {
+            args += ["--resume", resumeSessionID]
+        }
+
+        if forkSession {
+            args += ["--fork-session"]
+        }
+
+        if let sessionID {
+            args += ["--session-id", sessionID]
+        }
+
+        if disableSessionPersistence {
+            args += ["--no-session-persistence"]
         }
 
         if let model {
             args += ["--model", model.rawValue]
         }
 
+        if let fallbackModel {
+            args += ["--fallback-model", fallbackModel.rawValue]
+        }
+
         if !allowedTools.isEmpty {
             args += ["--allowedTools"] + allowedTools
+        }
+
+        if !disallowedTools.isEmpty {
+            args += ["--disallowedTools"] + disallowedTools
         }
 
         if let maxTurns {
@@ -184,6 +237,10 @@ public struct ClaudeCodeConfiguration: Sendable {
 
         if let mcpConfigPath {
             args += ["--mcp-config", mcpConfigPath.path]
+        }
+
+        if strictMCPConfig {
+            args += ["--strict-mcp-config"]
         }
 
         for dir in pluginDirectories {
