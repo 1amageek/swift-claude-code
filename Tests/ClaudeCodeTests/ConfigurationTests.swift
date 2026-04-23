@@ -39,7 +39,7 @@ struct ConfigurationTests {
         #expect(args.contains("claude-opus-4-7"))
     }
 
-    @Test("mcpConfigs and mcpConfigPath can coexist")
+    @Test("mcpConfigs and mcpConfigPath emit one --mcp-config per value")
     func mcpDualMode() {
         let path = URL(fileURLWithPath: "/tmp/mcp.json")
         let config = ClaudeCodeConfiguration(
@@ -47,11 +47,19 @@ struct ConfigurationTests {
             mcpConfigPath: path
         )
         let args = config.arguments(prompt: "x")
-        let mcpIndices = args.enumerated().compactMap { $0.element == "--mcp-config" ? $0.offset : nil }
-        #expect(mcpIndices.count == 2)
+        let flagCount = args.filter { $0 == "--mcp-config" }.count
+        #expect(flagCount == 3)
         #expect(args.contains("{\"a\":1}"))
         #expect(args.contains("{\"b\":2}"))
         #expect(args.contains(path.path))
+
+        // Check each flag is immediately followed by its value (no bare positional leaks).
+        var seenPairs = 0
+        for (i, v) in args.enumerated() where v == "--mcp-config" {
+            let next = args.index(after: i)
+            if next < args.endIndex { seenPairs += 1 }
+        }
+        #expect(seenPairs == 3)
     }
 
     @Test("plugin directories pass as repeated --plugin-dir")

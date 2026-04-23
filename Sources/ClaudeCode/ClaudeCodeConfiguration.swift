@@ -178,8 +178,8 @@ public struct ClaudeCodeConfiguration: Sendable {
             args += ["--add-dir"] + additionalDirectories.map(\.path)
         }
 
-        if !mcpConfigs.isEmpty {
-            args += ["--mcp-config"] + mcpConfigs
+        for config in mcpConfigs {
+            args += ["--mcp-config", config]
         }
 
         if let mcpConfigPath {
@@ -266,14 +266,20 @@ public struct ClaudeCodeConfiguration: Sendable {
 
     /// Check login status by running `claude auth status --json`.
     ///
-    /// When `enforceOAuthOnly` is true (the default), API-key env vars are stripped
-    /// from the subprocess environment so the result reflects OAuth status only.
+    /// - CWD is set to `NSTemporaryDirectory()` so the subprocess never inherits
+    ///   a TCC-restricted working directory from the parent (which would trigger
+    ///   macOS folder-access prompts). Callers that need a specific CWD should
+    ///   run `auth status` themselves.
+    /// - When `enforceOAuthOnly` is true (the default), API-key env vars are
+    ///   stripped from the subprocess environment so the result reflects
+    ///   OAuth status only.
     public func checkAuthStatus() async -> AuthStatus {
         logger.info("[auth] checkAuthStatus: executable=\(executablePath, privacy: .public)")
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = ["auth", "status", "--json"]
+        process.currentDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
 
         var env = ProcessInfo.processInfo.environment
         if enforceOAuthOnly {
